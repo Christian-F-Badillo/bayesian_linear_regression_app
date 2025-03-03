@@ -7,6 +7,7 @@ format:
     orientation: rows
 server: shiny
 ---
+
 ```{r}
 #| context: setup
 library(data.table)
@@ -370,10 +371,88 @@ wine <- fread("http://archive.ics.uci.edu/ml/machine-learning-databases/wine-qua
 
 # Regresión Lineal Simple
 
+::: {.card title="Motivación: Ley de Igualación Generalizada" height=30%}
+
+La ley de igualación generaliza de Baum (1974) nos indica que las tasas de respuesta o de tiempo dedicado a cada opción (programa de refuerzo) se relaciona con la tasa de reforzamiento de la siguiente forma: 
+
+$$
+\frac{B_1}{B_2} = \beta_0 (\frac{R_1}{R_2})^{\beta_1}
+$$
+
+Donde:
+
+* $\frac{B_1}{B_2}$ representa la razón de las tasas de respuesta o el tiempo dedicado a cada opción.
+* $\frac{R_1}{R_2}$ representan las tasas de reforzamiento en cada opción.
+* $\beta_0$ es el sego que se tiene por la opción 1 en comparación a la opción 2.
+* $\beta_1$ es la sensibilidad que se tiene a las diferencias en las tasas de reforzamiento.
+
+Este modelo ha sido ampliamente utilizado para entender la conducta de elección y distribución del comportamiento tanto en humanos y otras especies. En los experimentos de elección en general tenemos dos opciones con distintos o mismos programas de refuerzo (IV, VI, FR, etc.) concurrentes y se mide la tasa de respuesta o tiempo dedicado a cada opción. Dado que la tasa de refuerzo es controlada, lo que se busca es estimar tanto el sesgo como la sensibilidad dadas otras condiciones experimentales (volatilidad del ambiente, contextos distintos, etc.).
+
+Dada la forma funcional del modelo, estimar los parámetros sería complicado, pero usando las propiedades matemáticas del logarítmo, podemos transformarlo en un modelo lineal simple.
+
+$$
+log(\frac{B_1}{B_2}) = log(\beta_0) + \beta_1 log(\frac{R_1}{R_2})
+$$
+La interpretación de esta versión modificada del modelo permanece sin cambios, simplemente se tiene que tomar en cuenta que la escala de las variables cambia.
+
+:::
+
+::: {.card title="Estimación de Parámetros."}
+
+Dado que nuestro modelo es una versión del modelo lineal simple, podemos estimar los parámetros por distintos métodos tales como mínimos cuadrados ordinarios (OLS, por sus siglas en inglés), máxima verosimilitud (MLE) o por métodos bayesianos. Para nuestro ejemplo usaremos el método bayesiano.
+
+En el enfoque bayesiano se busca estimar la distribución de los parámetros dado los datos observados está distribución es conocida como posterior y es el resultado de combinar la información previa que se tiene de los parámetros con la información que se tiene de los datos observados dado nuestro modelo.
+
+Definimos la posterior como:
+
+$$
+p(\Theta|x_1, \dots, x_n) \propto p(x_1, \dots, x_n| \Theta) p(\Theta)
+$$
+
+Donde: 
+
+* $p(x_1, \dots, x_n| \Theta)$ es la verosimilitud de los datos dado los parámetros del modelo.
+* $p(\Theta)$ es la distribución prior o inicial que representa nuestro conocimiento de los parámetros antes de observar los datos.
+
+A pesar de la facilidad a prmera vista, el obtener la distribución posterior no es una tarea trivial y en general no tiene una forma analítica cerrada por lo que a menudo se recurre a métodos numéricos para obtener una aproximación a la distribución posterior, tales como MCMC (Markov Chain Monte Carlo) o métodos variacionales.
+
+Sin embargo, en casos particulares es posible obtener expresiones tratables matemáticamente para la distribución posterior, en particular cuando dado un prior conjugado, la distribución posterior es de la misma familia que el prior, el prior conjugado no existe para todos los modelos, pero en nuestro caso existe.
+
+Antes de ver el prior, es importante conocer nuestra función de verosimilitud, la cual para el modelo lineal simple es:
+
+$$
+p(y|X, \beta, \sigma^2) = \prod_{i=1}^{n} \frac{1}{\sqrt{2\pi \sigma^2}} exp(-\frac{1}{2\sigma^2}(y_i - \beta_0 - \beta_1 x_i)^2)
+$$
+
+Usando notación de algebra lineal, se puede reescribir como:
+
+$$
+p(y|X, \beta, \sigma^2) = \frac{1}{(2\pi \sigma^2)^{n/2}} exp(-\frac{1}{2\sigma^2}(y - X\beta)^T(y - X\beta))
+$$
+
+Nuestro prior conjugado es una distribución normal multivariada para los parámetros $\beta$ y una distribución gamma inversa para la varianza $\sigma^2$, la distribución completa es simplemente el producto de ambos, pero cabe destacar que la distribución de los parámetros $\beta$ depende de la vairanza $\sigma^2$. Podemos expresarlo como:
+
+$$
+p(\beta, \sigma^2) = p(\beta|\sigma^2) p(\sigma^2)
+$$
+
+$$
+p(\beta, \sigma^2) = N_n (\beta|\beta_0, \sigma^2 \Sigma) IG(\sigma^2|\nu_0, s_0^2)
+$$
+
+Usando su densidad de probabilidad, tenemos:
+
+$$
+p(\beta, \sigma^2) = \frac{1}{(2\pi)^{k/2} |\Sigma|^{1/2}} exp(-\frac{1}{2}(\beta - \beta_0)^T \Sigma^{-1} (\beta - \beta_0)) \times \frac{1}{B(\frac{\nu_0}{2}, \frac{\nu_0 s_0^2}{2})} (\frac{\nu_0 s_0^2}{2})^{\frac{\nu_0}{2}} (\sigma^2)^{-\frac{\nu_0 + k + 2}{2}} exp(-\frac{\nu_0 s_0^2}{2 \sigma^2})
+$$
+
+:::
+
+
 
 # App
 
-## {.sidebar}
+##  {.sidebar}
 
 ```{r}
 actionButton("run_sampling", "Muestrear")
@@ -450,14 +529,14 @@ br()
 
 ```{r}
 sliderInput("df_chi", "Grados de Libertad", 
-              min = 1, max = 10, value = 1)
+              min = 1, max = 30, value = 1, step = 1)
 
 sliderInput("scale_chi", "Escala", 
-              min = 1, max = 10, value = 1)
+              min = 1, max = 20, value = 1, step = 0.1)
 ```
 
-
 ## Datos {height="35%"}
+
 ```{r}
 #| context: server
 
@@ -570,7 +649,7 @@ plotOutput('plot_betas_postconj')
 plotOutput("plot_sigma_post")
 ```
 
-### Row 
+### Row
 
 ```{r}
 #| title: "Marginales Teóricas vs Muestreadas"
